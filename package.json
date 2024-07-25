@@ -1,0 +1,16 @@
+{
+  "name": "telegram-fritz-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "bot.js",
+  "type": "module",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "crypto": "^1.0.1",
+    "node-fetch": "^3.0.0",
+    "papaparse": "^5.4.1",
+    "telegraf": "^4.0.0"
+  }
+}
