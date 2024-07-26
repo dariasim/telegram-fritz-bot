@@ -1,32 +1,22 @@
-import { getSecret, SSMParameter } from "../lib/ssm";
-import { sendMessage } from "../lib/telegram";
+import { APIGatewayProxyEvent, Context } from 'aws-lambda';
+import { handleMessage } from 'src/lib/fritz';
 
-const parseLambdaEvent = (event: any) => {
-
-  const body = JSON.parse(event.body);
-
-  console.log('Received new message', body);
-
+const parseLambdaEvent = (event: APIGatewayProxyEvent): FritzInput => {
+  const body: TelegramEvent = JSON.parse(event.body);
   const chatId = body.message.chat.id;
-  const text = body.message.text.toLowerCase();
+  const text = body.message.text;
   const username = body.message.from.username;
-
-  return { chatId, text, username };
+  const command = body?.message?.entities?.[0]?.type;
+  return { chatId, text, username, command };
 };
 
-export const handler = async (event: any, context: any) => {
+export const handler = async (event: APIGatewayProxyEvent, context: Context) => {
   try {
-    console.log('EVENT', event);
-    console.log('CONTEXT', context);
+    const input = parseLambdaEvent(event);
+    await handleMessage(input);
 
-    const { chatId, text, username } = parseLambdaEvent(event);
-    const token = await getSecret(SSMParameter.FritzBotToken);
-
-    await sendMessage(chatId, `Hello ${username}, you said: ${text}`, token);
-
-    return { body: JSON.stringify({ message: 'ok' }), statusCode: 200 };
   } catch (error) {
     console.log('ERROR', JSON.stringify(error));
-    return { statusCode: 500, message: 'error' };
+    return { statusCode: 500 };
   }
 };
