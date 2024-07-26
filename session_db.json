@@ -1,0 +1,188 @@
+{
+  "sessions": [
+    {
+      "id": "390288053:390288053",
+      "data": {
+        "words": [
+          {
+            "german": "Eins",
+            "russian": "Один",
+            "status": "practiced"
+          },
+          {
+            "german": "Zwei",
+            "russian": "Два",
+            "status": "practiced"
+          },
+          {
+            "german": "Drei",
+            "russian": "Три",
+            "status": "practiced"
+          },
+          {
+            "german": "Vier",
+            "russian": "Четыре",
+            "status": "practiced"
+          },
+          {
+            "german": "Fünf",
+            "russian": "Пять",
+            "status": "practiced"
+          },
+          {
+            "german": "Sechs",
+            "russian": "Шесть",
+            "status": "practiced"
+          },
+          {
+            "german": "Sieben",
+            "russian": "Семь",
+            "status": "practiced"
+          },
+          {
+            "german": "Acht",
+            "russian": "Восемь",
+            "status": "practiced"
+          },
+          {
+            "german": "Neun",
+            "russian": "Девять",
+            "status": "practiced"
+          },
+          {
+            "german": "Zehn",
+            "russian": "Десять",
+            "status": "practiced"
+          }
+        ],
+        "topic": "Numbers",
+        "currentWord": {
+          "german": "Zehn",
+          "russian": "Десять",
+          "status": "practiced"
+        }
+      }
+    },
+    {
+      "id": "1542727970:1542727970",
+      "data": {
+        "words": [
+          {
+            "german": "Arzt",
+            "russian": "Врач",
+            "status": "practiced"
+          },
+          {
+            "german": "Ingenieur",
+            "russian": "Инженер",
+            "status": "practiced"
+          },
+          {
+            "german": "Koch",
+            "russian": "Повар",
+            "status": "practiced"
+          },
+          {
+            "german": "Bauer",
+            "russian": "Фермер",
+            "status": "practiced"
+          },
+          {
+            "german": "Anwalt",
+            "russian": "Адвокат",
+            "status": "practiced"
+          },
+          {
+            "german": "Polizist",
+            "russian": "Полицейский",
+            "status": "practiced"
+          },
+          {
+            "german": "Verkäufer",
+            "russian": "Продавец",
+            "status": "practiced"
+          },
+          {
+            "german": "Friseur",
+            "russian": "Парикмахер",
+            "status": "practiced"
+          },
+          {
+            "german": "Mechaniker",
+            "russian": "Механик",
+            "status": "practiced"
+          }
+        ],
+        "topic": "Professions",
+        "currentWord": {
+          "german": "Mechaniker",
+          "russian": "Механик",
+          "status": "practiced"
+        }
+      }
+    },
+    {
+      "id": "7127564:7127564",
+      "data": {
+        "words": [
+          {
+            "german": "Kopf",
+            "russian": "Голова",
+            "status": "practiced"
+          },
+          {
+            "german": "Arm",
+            "russian": "Рука",
+            "status": "practiced"
+          },
+          {
+            "german": "Bein",
+            "russian": "Нога",
+            "status": "practiced"
+          },
+          {
+            "german": "Hand",
+            "russian": "Кисть",
+            "status": "practiced"
+          },
+          {
+            "german": "Fuß",
+            "russian": "Ступня",
+            "status": "practiced"
+          },
+          {
+            "german": "Auge",
+            "russian": "Глаз",
+            "status": "practiced"
+          },
+          {
+            "german": "Ohr",
+            "russian": "Ухо",
+            "status": "practiced"
+          },
+          {
+            "german": "Nase",
+            "russian": "Нос",
+            "status": "practiced"
+          },
+          {
+            "german": "Mund",
+            "russian": "Рот",
+            "status": "practiced"
+          },
+          {
+            "german": "Herz",
+            "russian": "Сердце",
+            "status": "practiced"
+          }
+        ],
+        "topic": "Body Parts",
+        "currentWord": {
+          "german": "Herz",
+          "russian": "Сердце",
+          "status": "practiced"
+        }
+      }
+    }
+  ]
+}

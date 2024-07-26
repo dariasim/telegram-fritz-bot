@@ -1,9 +1,14 @@
 import { Telegraf } from 'telegraf';
+import LocalSession from 'telegraf-session-local';
 import fetch from 'node-fetch';
 import Papa from 'papaparse';
 
 // Initialize the bot with your token
 const bot = new Telegraf('7247551367:AAHB01A-C0ZCLup_fXMtuX1tEAZkLhbSaCs');
+
+// Use the session middleware
+const localSession = new LocalSession({ database: 'session_db.json' });
+bot.use(localSession.middleware());
 
 // Google Sheets public URL and sheet names
 const spreadsheetId = '1Lw_1a_irROHFvSZokVH89SGHdNYbb6IKxWx2NxVjAnw'; // Use the actual Spreadsheet ID
@@ -49,7 +54,7 @@ bot.start(async (ctx) => {
     const allWords = await getAllWords();
     const topicButtons = topics.map(topic => {
       const count = allWords.filter(word => word.topic === topic).length;
-      return [{ text: `${topic} (${count})`, callback_data: topic }];
+      return [{ text: `${topic} (${count})`, callback_data: JSON.stringify({ action: 'select_topic', topic }) }];
     });
 
     ctx.reply('Welcome! Which topic would you like to practice?', {
@@ -63,17 +68,46 @@ bot.start(async (ctx) => {
 });
 
 bot.on('callback_query', async (ctx) => {
-  const topic = ctx.callbackQuery.data;
-  const words = await getWordsByTopic(topic);
+  const data = JSON.parse(ctx.callbackQuery.data);
 
-  if (!ctx.session) {
-    ctx.session = {};
+  if (data.action === 'select_topic') {
+    const topic = data.topic;
+    const words = await getWordsByTopic(topic);
+
+    // Store words and topic in session
+    ctx.session.words = words;
+    ctx.session.topic = topic;
+
+    // Log the words for debugging
+    console.log(`Selected topic: ${topic}`);
+    console.log(`Words for the topic: ${JSON.stringify(words, null, 2)}`);
+
+    askQuestion(ctx);
+  } else if (data.action === 'answer_question') {
+    const { answer } = data;
+    const { currentWord, words, topic } = ctx.session;
+
+    let responseMessage;
+    if (answer === currentWord.russian) {
+      responseMessage = 'Bravo!';
+      currentWord.status = 'practiced';
+    } else {
+      responseMessage = 'Falsch, blin! No worries, we will try again.';
+    }
+
+    // Log the answer and updated words for debugging
+    console.log(`Answer: ${responseMessage}`);
+    console.log(`Updated words: ${JSON.stringify(words, null, 2)}`);
+
+    await ctx.reply(responseMessage);
+
+    const wordToPractice = words.find(word => word.status === 'to_practice');
+    if (!wordToPractice) {
+      ctx.reply(`Congrats! You have practiced all the words from topic "${topic}".`);
+    } else {
+      askQuestion(ctx);
+    }
   }
-
-  ctx.session.words = words;
-  ctx.session.topic = topic;
-
-  askQuestion(ctx);
 });
 
 function askQuestion(ctx) {
@@ -90,7 +124,7 @@ function askQuestion(ctx) {
 
   ctx.reply(`What is the translation of "${wordToPractice.german}"?`, {
     reply_markup: {
-      inline_keyboard: options.map(option => [{ text: option, callback_data: JSON.stringify({ answer: option, topic: ctx.session.topic }) }])
+      inline_keyboard: options.map(option => [{ text: option, callback_data: JSON.stringify({ action: 'answer_question', answer: option }) }])
     }
   });
 }
@@ -112,26 +146,6 @@ function shuffleArray(array) {
   }
   return array;
 }
-
-bot.on('callback_query', async (ctx) => {
-  const data = JSON.parse(ctx.callbackQuery.data);
-  const { answer, topic } = data;
-  const { currentWord, words } = ctx.session;
-
-  if (answer === currentWord.russian) {
-    await ctx.reply('Bravo!');
-    currentWord.status = 'practiced';
-  } else {
-    await ctx.reply('Falsch, blin! No worries, we will try again.');
-  }
-
-  const wordToPractice = words.find(word => word.status === 'to_practice');
-  if (!wordToPractice) {
-    ctx.reply(`Congrats! You have practiced all the words from topic "${topic}".`);
-  } else {
-    askQuestion(ctx);
-  }
-});
 
 bot.launch().then(() => {
   console.log('Bot started successfully.');
