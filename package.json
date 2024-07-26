@@ -10,8 +10,11 @@
   },
   "dependencies": {
     "@aws-sdk/client-ssm": "^3.620.0",
+    "@types/aws-lambda": "^8.10.142",
+    "@types/papaparse": "^5.3.14",
     "aws-cdk": "^2.150.0",
     "aws-cdk-lib": "^2.150.0",
+    "aws-lambda": "^1.0.7",
     "papaparse": "^5.4.1",
     "source-map-support": "^0.5.21",
     "typescript": "^5.5.4",
