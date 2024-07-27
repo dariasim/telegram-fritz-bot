@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as nodeLambda from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigateway from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -63,6 +64,39 @@ export class FritzBotStack extends cdk.Stack {
       methods: [apigateway.HttpMethod.POST],
       integration: fritzBotLambdaIntegration
     });
+
+    // create dynamodb
+    const table = new dynamodb.Table(this, 'DynamoDBTableFritzBot', {
+      tableName: 'fritz-bot',
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      partitionKey: {
+        name: 'pk',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'sk',
+        type: dynamodb.AttributeType.STRING
+      }
+    });
+
+    // Add Global Secondary Index (GSI)
+    table.addGlobalSecondaryIndex({
+      indexName: 'gsi1pk-gsi1sk-index',
+      partitionKey: {
+        name: 'gsi1pk',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'gsi1sk',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // Grant read/write access to the Lambda function
+    table.grantReadWriteData(fritzBotLambda);
 
     // Create output for API Gateway URL
     new cdk.CfnOutput(this, 'FritzBotApiUrl', {

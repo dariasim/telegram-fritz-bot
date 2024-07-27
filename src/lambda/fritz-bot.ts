@@ -1,22 +1,15 @@
 import { APIGatewayProxyEvent, Context } from 'aws-lambda';
-import { handleMessage } from 'src/lib/fritz';
+import { FritzBot } from 'src/lib/fritz';
+import { logger } from 'src/lib/logger';
 
-const parseLambdaEvent = (event: APIGatewayProxyEvent): FritzInput => {
-  const body: TelegramEvent = JSON.parse(event.body);
-  const chatId = body.message.chat.id;
-  const text = body.message.text;
-  const username = body.message.from.username;
-  const command = body?.message?.entities?.[0]?.type;
-  return { chatId, text, username, command };
-};
+const bot = new FritzBot();
 
 export const handler = async (event: APIGatewayProxyEvent, context: Context) => {
   try {
-    const input = parseLambdaEvent(event);
-    await handleMessage(input);
-
+    const body: TelegramEvent = JSON.parse(event.body);
+    await bot.handleEvent(body);
   } catch (error) {
-    console.log('ERROR', JSON.stringify(error));
+    logger.error('Error handling message', { error });
     return { statusCode: 500 };
   }
 };
