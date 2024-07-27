@@ -13,18 +13,12 @@ const ssmCache = new Map<string, string>();
 
 export const getSecret = async (parameter: SSMParameter): Promise<string> => {
 
-  console.log(`Getting parameter ${parameter}`);
-
   // check if parameter is cached
   if (ssmCache.has(parameter)) {
-    console.log(`Parameter ${parameter} found in cache`);
     return ssmCache.get(parameter) as string;
   }
 
-  console.log('Parameter not found in cache');
-
   // get parameter from SSM
-  console.log(`Getting parameter ${parameter} from SSM`);
   const input: GetParameterCommandInput = {
     Name: parameter,
     WithDecryption: true, // Set to true if the parameter value is stored encrypted
@@ -38,8 +32,6 @@ export const getSecret = async (parameter: SSMParameter): Promise<string> => {
     console.error(`Parameter ${parameter} not found`);
     throw new Error(`Parameter ${parameter} not found`);
   }
-
-  console.log(`Parameter ${parameter} found`, secret);
 
   // cache parameter
   ssmCache.set(parameter, secret as string);
