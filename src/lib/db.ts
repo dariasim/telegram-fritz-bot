@@ -2,87 +2,94 @@ import { Entity } from 'electrodb';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { logger } from './logger';
 
-const client = new DynamoDBClient({ region: 'eu-central-1' });
-const table = 'fritz-bot';
+export class SessionStore {
 
-const BotSession = new Entity({
-  model: {
-    entity: 'BotSession',
-    service: 'fritz-bot',
-    version: '1',
-  },
-  attributes: {
-    id: {
-      type: "number",
-      required: true
-    },
-    topic: {
-      type: "string",
-      required: true
-    },
-    words: {
-      type: "list",
-      required: true,
-      items: {
-        type: "map",
-        properties: {
-          german: { type: "string", required: true },
-          russian: { type: "string", required: true },
-          status: { type: "string", required: true }
+  private dynamoDBClient: DynamoDBClient;
+  private tableName: string;
+  private sessionEntity;
+
+  constructor() {
+    this.dynamoDBClient = new DynamoDBClient({ region: 'eu-central-1' });
+    this.tableName = 'fritz-bot';
+    this.sessionEntity = new Entity({
+      model: {
+        entity: 'BotSession',
+        service: 'fritz-bot',
+        version: '1',
+      },
+      attributes: {
+        id: {
+          type: "number",
+          required: true
+        },
+        topic: {
+          type: "string",
+          required: true
+        },
+        words: {
+          type: "list",
+          required: true,
+          items: {
+            type: "map",
+            properties: {
+              german: { type: "string", required: true },
+              russian: { type: "string", required: true },
+              status: { type: "string", required: true }
+            }
+          }
+        },
+        word: {
+          type: "map",
+          properties: {
+            german: { type: "string", required: true },
+            russian: { type: "string", required: true },
+            status: { type: "string", required: true }
+          }
+        },
+        answers: {
+          type: "list",
+          required: true,
+          items: {
+            type: "string", required: true
+          }
+        }
+      },
+      indexes: {
+        primary: {
+          pk: { field: "pk", composite: ["id"] },
+          sk: { field: "sk", composite: ["id"] }
         }
       }
-    },
-    currentWord: {
-      type: "map",
-      properties: {
-        german: { type: "string", required: true },
-        russian: { type: "string", required: true },
-        status: { type: "string", required: true }
-      }
-    },
-    currentAnswers: {
-      type: "list",
-      required: true,
-      items: {
-        type: "string", required: true
-      }
-    }
-  },
-  indexes: {
-    primary: {
-      pk: { field: "pk", composite: ["id"] },
-      sk: { field: "sk", composite: ["id"] }
+    }, { client: this.dynamoDBClient, table: this.tableName });
+  }
+
+  public async insertSession(session: TelegramSession) {
+    try {
+      await this.sessionEntity.put(session).go();
+    } catch (error) {
+      logger.error(error);
+      throw error;
     }
   }
-}, { client, table });
 
-export const insertSession = async (session: any) => {
-  try {
-    await BotSession.put(session).go();
+  public async getSession(id: number) {
+    try {
+      const session = await this.sessionEntity.get({ id }).go();
+      return session.data as TelegramSession;
 
-  } catch (error) {
-    logger.error(error);
-    throw error;
+    } catch (error) {
+      logger.error(error);
+      throw error;
+    }
   }
-}
 
-export const getSession = async (id: number) => {
-  try {
-    const session = await BotSession.get({ id }).go();
-    return session.data;
+  public async deleteSession(id: number) {
+    try {
+      await this.sessionEntity.delete({ id }).go();
 
-  } catch (error) {
-    logger.error(error);
-    throw error;
-  }
-}
-
-export const deleteSession = async (id: number) => {
-  try {
-    await BotSession.delete({ id }).go();
-
-  } catch (error) {
-    logger.error(error);
-    throw error;
+    } catch (error) {
+      logger.error(error);
+      throw error;
+    }
   }
 }

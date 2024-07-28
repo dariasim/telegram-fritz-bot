@@ -1,26 +1,10 @@
-import { getGoogleSheetUrl, SheetName } from "./constants";
 import { getSecret, SSMParameter } from "./ssm";
 import { request } from "undici";
 import { parse } from "papaparse";
+import * as TelegramConstants from "../constants/telegram";
 
-export const enum WordStatus {
-  ToPractice = 'to_practice',
-  Practiced = 'practiced'
-}
-
-export interface Word {
-  german: string;
-  russian: string;
-  status: WordStatus;
-}
-
-interface SheetOneEntry {
-  topic: string;
-}
-
-interface SheetTwoEntry extends SheetOneEntry {
-  german: string;
-  russian: string;
+export const getGoogleSheetUrl = (spreadsheetId: string, sheetName: SheetName) => {
+  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${sheetName}`;
 }
 
 export const fetchSheetData = async <T>(sheetName: SheetName): Promise<T> => {
@@ -43,7 +27,7 @@ export const getWords = async (topic: string): Promise<Word[]> => {
 
   const words = entries
     .filter(entry => entry.topic === topic)
-    .map(entry => ({ german: entry.german, russian: entry.russian, status: WordStatus.ToPractice }));
-    
+    .map(entry => ({ german: entry.german, russian: entry.russian, status: TelegramConstants.WordStatuses.ToPractice }));
+
   return words;
 }
