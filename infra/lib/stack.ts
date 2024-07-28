@@ -44,7 +44,7 @@ export class FritzBotStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler',
       memorySize: 1024,
-      entry: 'src/lambda/fritz-bot.ts',
+      entry: 'src/lambda/fritz-bot-lambda.ts',
       loggingFormat: lambda.LoggingFormat.JSON,
       systemLogLevelV2: lambda.SystemLogLevel.WARN,
       logRetention: 7,

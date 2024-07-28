@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, Context } from 'aws-lambda';
-import { FritzBot } from 'src/lib/fritz';
+import { FritzBot } from 'src/lib/fritz-bot';
 import { logger } from 'src/lib/logger';
 
 const bot = new FritzBot();

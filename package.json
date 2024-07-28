@@ -1,26 +1,27 @@
 {
   "name": "telegram-fritz-bot",
   "version": "1.0.0",
-  "description": "",
-  "main": "bot.js",
+  "description": "Frit bot for Telegram",
   "type": "module",
   "scripts": {
-    "start": "node bot.js",
+    "build": "tsc --noEmit",
     "deploy": "npx cdk deploy --profile aws-playground-service-account --require-approval never"
   },
   "dependencies": {
     "@aws-lambda-powertools/logger": "^2.6.0",
     "@aws-sdk/client-dynamodb": "^3.620.0",
     "@aws-sdk/client-ssm": "^3.620.0",
+    "aws-lambda": "^1.0.7",
+    "electrodb": "^2.14.2",
+    "papaparse": "^5.4.1",
+    "undici": "^6.19.4"
+  },
+  "devDependencies": {
     "@types/aws-lambda": "^8.10.142",
     "@types/papaparse": "^5.3.14",
     "aws-cdk": "^2.150.0",
     "aws-cdk-lib": "^2.150.0",
-    "aws-lambda": "^1.0.7",
-    "electrodb": "^2.14.2",
-    "papaparse": "^5.4.1",
     "source-map-support": "^0.5.21",
-    "typescript": "^5.5.4",
-    "undici": "^6.19.4"
+    "typescript": "^5.5.4"
   }
 }
