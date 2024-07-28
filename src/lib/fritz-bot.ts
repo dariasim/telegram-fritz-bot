@@ -64,10 +64,11 @@ export class FritzBot {
 
     const request = {
       chatId: this.chatId,
-      text: `What is the translation of the word: "${wordToPractice.german}"?`,
+      text: `Select translation for: \n \n *${wordToPractice.german}*`,
       items,
       action: TelegramConstants.TelegramActions.SelectAnswer,
-      shouldShuffleArray: true
+      shouldShuffleArray: true,
+      parse_mode: TelegramConstants.TelegramParseModes.MarkdownV2
     }
 
     logger.info('Sending the next question', { request });
@@ -164,8 +165,16 @@ export class FritzBot {
 
         // handle the case when the selected word is correct
         if (isCorrect) {
+          
+          // send a message to the user that the selected word is correct
+          const request = {
+            chatId: this.chatId,
+            text: 'Correct',
+          }
+         
           logger.info('Selected word is correct', { word: this.session.word });
           await this.updateWordStatus();
+          await client.sendMessage(request);
           return await this.getNextQuestion();
         }
 
@@ -175,13 +184,12 @@ export class FritzBot {
           // send a message to the user that the selected word is incorrect
           const request = {
             chatId: this.chatId,
-            text: 'Incorrect. Try again.',
-            items: this.session.answers,
-            action: TelegramConstants.TelegramActions.SelectAnswer
+            text: 'Incorrect. We will try again later.',
           }
 
           logger.info('Selected word is incorrect', { request });
-          return await client.sendMessageWithButtons(request);
+          await client.sendMessage(request);
+          return await this.getNextQuestion();
         }
       }
     }
