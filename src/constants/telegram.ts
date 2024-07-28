@@ -15,3 +15,7 @@ export const TelegramMethods = {
 export const TelegramEntityTypes = {
   BotCommand: 'bot_command' as const
 };
+
+export const TelegramParseModes = {
+  MarkdownV2: 'MarkdownV2' as const
+};

@@ -1,10 +1,11 @@
-import { WordStatuses, TelegramActions, TelegramMethods, TelegramEntityTypes } from '../constants/telegram';
+import { WordStatuses, TelegramActions, TelegramMethods, TelegramEntityTypes, TelegramParseModes } from '../constants/telegram';
 
 declare global {
   type WordStatus = typeof WordStatuses[keyof typeof WordStatuses];
   type TelegramAction = typeof TelegramActions[keyof typeof TelegramActions];
   type TelegramMethod = typeof TelegramMethods[keyof typeof TelegramMethods];
   type TelegramEntityType = typeof TelegramEntityTypes[keyof typeof TelegramEntityTypes];
+  type TelegramParseMode = typeof TelegramParseModes[keyof typeof TelegramParseModes];
 
   interface TelegramEntity {
     offset: number;
@@ -74,6 +75,7 @@ declare global {
     reply_markup?: TelegramReplyMarkup;
     action?: TelegramAction;
     shouldShuffleArray?: boolean;
+    parse_mode?: TelegramParseMode; 
   }
 
   interface Word {

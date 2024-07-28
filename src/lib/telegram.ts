@@ -32,7 +32,7 @@ class TelegramClient {
 
   public async sendMessage(message: SendMessageRequest) {
     const token = await this.getToken();
-    const { chatId, text, reply_markup } = message;
+    const { chatId, text, reply_markup,  parse_mode } = message;
 
     // prevent sending empty messages
     if (!text) {
@@ -45,7 +45,7 @@ class TelegramClient {
     const { statusCode, headers, body } = await request(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, reply_markup })
+      body: JSON.stringify({ chat_id: chatId, text, reply_markup, parse_mode })
     });
 
     if (statusCode !== 200) {
@@ -58,12 +58,13 @@ class TelegramClient {
   }
 
   public async sendMessageWithButtons(message: SendMessageRequest) {
-    const { items, action, shouldShuffleArray } = message;
+    const { items, action, shouldShuffleArray, parse_mode  } = message;
 
     const request = {
       chatId: message.chatId,
       text: message.text,
-      reply_markup: this.createButtons(action, items, shouldShuffleArray)
+      reply_markup: this.createButtons(action, items, shouldShuffleArray),
+      parse_mode
     }
 
     logger.info('Sending message with buttons', { request });
