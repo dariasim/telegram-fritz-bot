@@ -1,6 +1,6 @@
 import { request } from 'undici';
 import { getSecret, SSMParameter } from './ssm';
-import { shuffleArray } from './utils';
+import { escapeString, shuffleArray } from './utils';
 import * as TelegramConstants from '../constants/telegram';
 import { logger } from './logger';
 
@@ -32,7 +32,7 @@ class TelegramClient {
 
   public async sendMessage(message: SendMessageRequest) {
     const token = await this.getToken();
-    const { chatId, text, reply_markup, parse_mode } = message;
+    const { chatId, text, reply_markup } = message;
 
     // prevent sending empty messages
     if (!text) {
@@ -42,10 +42,19 @@ class TelegramClient {
     const method: TelegramMethod = TelegramConstants.TelegramMethods.SendMessage;
     const url = `${this.baseUrl}${token}/${method}`;
 
+    const req = {
+      chat_id: chatId,
+      text: escapeString(text),
+      reply_markup,
+      parse_mode: TelegramConstants.TelegramParseModes.MarkdownV2
+    };
+
+    logger.info('Sending message to Telegram', { url, req });
+
     const { statusCode, headers, body } = await request(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, reply_markup, parse_mode })
+      body: JSON.stringify(req)
     });
 
     if (statusCode !== 200) {
@@ -53,39 +62,26 @@ class TelegramClient {
       const payload = await body.json() as TelegramError;
 
       // handle the case when the error is due to the length
-      if (payload.error_code === 400) {
-        const tooLongWords = reply_markup.inline_keyboard
-          .filter(row => row.some(button => button.text.length > 30))
-          .map(row => row.map(button => button.text));
-
-        await this.sendMessage({
-          chatId,
-          text: `The length of "${tooLongWords.join(',')}" is too long. It should be maximum of 30 characters. Please shorten the text and try again.`
-        });
+      if (payload.description.includes(TelegramConstants.TelegramErrors.BadRequestSpecialCharacter)) {
+        logger.error('Error sending message to Telegram', { url, statusCode, headers, body: payload });
       }
-    }
 
-    // handle the general case when the message is not sent
-    else {
-      logger.error('Error sending message to Telegram', { url, statusCode, headers, body: payload });
-      await this.sendMessage({
-        chatId,
-        text: 'Error sending message to Telegram. Please try again.'
-      });
+      // handle the general case when the message is not sent
+      else {
+        logger.error('Error sending message to Telegram', { url, statusCode, headers, body: payload });
+      }
     }
   }
 
   public async sendMessageWithButtons(message: SendMessageRequest) {
-    const { items, action, shouldShuffleArray, parse_mode } = message;
+    const { items, action, shouldShuffleArray } = message;
 
     const request = {
       chatId: message.chatId,
       text: message.text,
-      reply_markup: this.createButtons(action, items, shouldShuffleArray),
-      parse_mode
+      reply_markup: this.createButtons(action, items, shouldShuffleArray)
     }
 
-    logger.info('Sending message with buttons', { request });
     await this.sendMessage(request);
   }
 }
