@@ -7,6 +7,12 @@ declare global {
   type TelegramEntityType = typeof TelegramEntityTypes[keyof typeof TelegramEntityTypes];
   type TelegramParseMode = typeof TelegramParseModes[keyof typeof TelegramParseModes];
 
+  interface TelegramError {
+    ok: boolean
+    error_code: number;
+    description: string;
+  }
+
   interface TelegramEntity {
     offset: number;
     length: number;
