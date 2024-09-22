@@ -32,7 +32,7 @@ class TelegramClient {
 
   public async sendMessage(message: SendMessageRequest) {
     const token = await this.getToken();
-    const { chatId, text, reply_markup,  parse_mode } = message;
+    const { chatId, text, reply_markup, parse_mode } = message;
 
     // prevent sending empty messages
     if (!text) {
@@ -49,16 +49,34 @@ class TelegramClient {
     });
 
     if (statusCode !== 200) {
-      console.log('Error sending message to Telegram');
-      console.log('Url:', url);
-      console.log('Status code:', statusCode);
-      console.log('Headers:', headers);
-      console.log('Body:', await body.json());
+
+      const payload = await body.json() as TelegramError;
+
+      // handle the case when the error is due to the length
+      if (payload.error_code === 400) {
+        const tooLongWords = reply_markup.inline_keyboard
+          .filter(row => row.some(button => button.text.length > 30))
+          .map(row => row.map(button => button.text));
+
+        await this.sendMessage({
+          chatId,
+          text: `The length of "${tooLongWords.join(',')}" is too long. It should be maximum of 30 characters. Please shorten the text and try again.`
+        });
+      }
+    }
+
+    // handle the general case when the message is not sent
+    else {
+      logger.error('Error sending message to Telegram', { url, statusCode, headers, body: payload });
+      await this.sendMessage({
+        chatId,
+        text: 'Error sending message to Telegram. Please try again.'
+      });
     }
   }
 
   public async sendMessageWithButtons(message: SendMessageRequest) {
-    const { items, action, shouldShuffleArray, parse_mode  } = message;
+    const { items, action, shouldShuffleArray, parse_mode } = message;
 
     const request = {
       chatId: message.chatId,
