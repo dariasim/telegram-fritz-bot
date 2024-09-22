@@ -4,4 +4,4 @@ import * as cdk from 'aws-cdk-lib';
 import { FritzBotStack } from '../lib/stack';
 
 const app = new cdk.App();
-new FritzBotStack(app, 'FritzBotStack', {});
+new FritzBotStack(app, 'fritz-bot-stack', {});

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit",
-    "deploy": "npx cdk deploy --profile aws-playground-service-account --require-approval never"
+    "deploy": "npx cdk deploy --profile fritz-bot --require-approval never"
   },
   "dependencies": {
     "@aws-lambda-powertools/logger": "^2.8.0",

@@ -22,7 +22,7 @@ export class FritzBotStack extends cdk.Stack {
     lambdaRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'));
 
     // Attach SSM read-only policy
-    const ssmParameterPrefix = 'arn:aws:ssm:eu-central-1:359330567557:parameter/'
+    const ssmParameterPrefix = 'arn:aws:ssm:eu-central-1:277707127928:parameter/'
     lambdaRole.addToPolicy(new iam.PolicyStatement({
       actions: ['ssm:GetParameter'],
       resources: [
