@@ -7,7 +7,8 @@ declare global {
 
   interface SheetTwoEntry extends SheetOneEntry {
     german: string;
-    russian: string;
+    english: string;
+    speech_part: string;
   }
 }
 

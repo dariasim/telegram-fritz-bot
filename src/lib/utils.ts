@@ -17,5 +17,6 @@ export const escapeString = (text: string): string => {
   return text
     .replaceAll(/\(/g, '\\(')  // escape (
     .replaceAll(/\)/g, '\\)')  // escape )
-    .replaceAll(/\./g, '\\.'); // escape .
+    .replaceAll(/\./g, '\\.')  // escape .
+    .replaceAll(/\!/g, '\\!'); // escape !
 };
