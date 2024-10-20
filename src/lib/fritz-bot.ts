@@ -10,6 +10,7 @@ export class FritzBot {
 
   private chatId: number;
   private topic: string;
+  private exerciseType: TelegramConstants.ExerciseType;
   private allWords: Word[];
   private wordsToPractice: Word[];
   private session: TelegramSession;
@@ -30,7 +31,46 @@ export class FritzBot {
     return this.wordsToPractice[Math.floor(Math.random() * this.wordsToPractice.length)];
   }
 
-  private async getNextQuestion() {
+  private async getNextReviewQuestion() {
+    // get words to practice
+    this.wordsToPractice = await this.getWordsToPractice();
+    logger.info('Words to review', { wordsToPractice: this.wordsToPractice });
+
+    // handle the case when there are no words to practice
+    if (this.wordsToPractice.length === 0) {
+      return await client.sendMessage({ chatId: this.chatId, text: 'Congrats! You reviewed all the words.' });
+    }
+
+    // get a random word to review
+    const wordToReview = this.getRandomWordToPractice();
+
+    // items are composed of two options: "Ok" and "Review later"
+    const items = [TelegramConstants.ReviewAnswers.ReviewLater, TelegramConstants.ReviewAnswers.Ok];
+
+    // save current state in db
+    const session = {
+      id: this.chatId,
+      topic: this.topic,
+      words: this.allWords,
+      word: wordToReview,
+      answers: items
+    }
+
+    logger.info('Saving the current session', { session });
+    await store.insertSession(session);
+
+    const request = {
+      chatId: this.chatId,
+      text: `Please review the following words: \n\nGerman: *${wordToReview.german}* \n\nEnglish: *${wordToReview.russian}*`,
+      items,
+      action: TelegramConstants.TelegramActions.SelectReviewAnswer
+    }
+
+    logger.info('Sending the next question', { request });
+    return await client.sendMessageWithButtons(request);
+  }
+
+  private async getNextPracticeQuestion() {
 
     // get words to practice
     this.wordsToPractice = await this.getWordsToPractice();
@@ -64,11 +104,10 @@ export class FritzBot {
 
     const request = {
       chatId: this.chatId,
-      text: `Select translation for: \n \n *${wordToPractice.german}*`,
+      text: `Select translation for: ${wordToPractice.german}`,
       items,
-      action: TelegramConstants.TelegramActions.SelectAnswer,
-      shouldShuffleArray: true,
-      parse_mode: TelegramConstants.TelegramParseModes.MarkdownV2
+      action: TelegramConstants.TelegramActions.SelectPracticeAnswer,
+      shouldShuffleArray: true
     }
 
     logger.info('Sending the next question', { request });
@@ -139,6 +178,18 @@ export class FritzBot {
     await store.insertSession(request);
   }
 
+  private async getExerciseType() {
+    const request = {
+      chatId: this.chatId,
+      text: `What kind of exercise would you like to do?`,
+      items: [TelegramConstants.ExerciseTypes.Review, TelegramConstants.ExerciseTypes.Practice],
+      action: TelegramConstants.TelegramActions.SelectExerciseType
+    }
+
+    logger.info('Sending exercise types', { request });
+    return await client.sendMessageWithButtons(request);
+  }
+
   private async handleSelectedAction(input: TelegramEvent) {
 
     // callback query is the data that is sent when the user selects an option
@@ -151,10 +202,62 @@ export class FritzBot {
       case TelegramConstants.TelegramActions.SelectTopic: {
         this.topic = item;
         logger.info('Selected topic', { topic: this.topic });
-        return await this.getNextQuestion();
+        return await this.getExerciseType();
       }
-      // this case is triggered everytime when the user selects an answer
-      case TelegramConstants.TelegramActions.SelectAnswer: {
+
+      // this case is triggered when the user selects the exercise type
+      case TelegramConstants.TelegramActions.SelectExerciseType: {
+        this.exerciseType = item as TelegramConstants.ExerciseType;
+        logger.info('Selected exercise type', { exerciseType: this.exerciseType });
+
+        // get the next question based on the selected exercise type
+        switch (this.exerciseType) {
+          case TelegramConstants.ExerciseTypes.Practice: return await this.getNextPracticeQuestion();
+          case TelegramConstants.ExerciseTypes.Review: return await this.getNextReviewQuestion();
+          default: return;
+        }
+      }
+
+      // this case is triggered when the user selects an answer for the review question
+      case TelegramConstants.TelegramActions.SelectReviewAnswer: {
+        // get the current session for the current user
+        this.session = await store.getSession(this.chatId);
+        this.topic = this.session.topic;
+
+        const shouldReviewLater = item === TelegramConstants.ReviewAnswers.ReviewLater;
+
+        // handle the case when the user selects to "Ok"
+        if (!shouldReviewLater) {
+
+          // send a message to the user that the selected word is correct
+          const request = {
+            chatId: this.chatId,
+            text: 'Ok. Here is your next word to review.',
+          }
+
+          logger.info('Selected word is ok', { word: this.session.word });
+          await this.updateWordStatus();
+          await client.sendMessage(request);
+          return await this.getNextReviewQuestion();
+        }
+
+        // handle the case when the user selects to "Review later"
+        else {
+
+          // send a message to the user that the selected word is incorrect
+          const request = {
+            chatId: this.chatId,
+            text: 'Ok, we will review this word later.',
+          }
+
+          logger.info('Selected word is review later', { request });
+          await client.sendMessage(request);
+          return await this.getNextReviewQuestion();
+        }
+      }
+
+      // this case is triggered when the user selects an answer for the practice question
+      case TelegramConstants.TelegramActions.SelectPracticeAnswer: {
 
         // get the current session for the current user
         this.session = await store.getSession(this.chatId);
@@ -165,17 +268,17 @@ export class FritzBot {
 
         // handle the case when the selected word is correct
         if (isCorrect) {
-          
+
           // send a message to the user that the selected word is correct
           const request = {
             chatId: this.chatId,
             text: 'Correct',
           }
-         
+
           logger.info('Selected word is correct', { word: this.session.word });
           await this.updateWordStatus();
           await client.sendMessage(request);
-          return await this.getNextQuestion();
+          return await this.getNextPracticeQuestion();
         }
 
         // if the selected word is incorrect
@@ -189,7 +292,7 @@ export class FritzBot {
 
           logger.info('Selected word is incorrect', { request });
           await client.sendMessage(request);
-          return await this.getNextQuestion();
+          return await this.getNextPracticeQuestion();
         }
       }
     }

@@ -6,3 +6,16 @@ export const shuffleArray = <T>(array: T[]): T[] => {
   }
   return newArray;
 }
+
+/**
+ * Escapes special characters in a string for Telegram's MarkdownV2 format.
+ * 
+ * @param {string} text - The input string to escape
+ * @returns {string} The escaped string
+ */
+export const escapeString = (text: string): string => {
+  return text
+    .replaceAll(/\(/g, '\\(')  // escape (
+    .replaceAll(/\)/g, '\\)')  // escape )
+    .replaceAll(/\./g, '\\.'); // escape .
+};
