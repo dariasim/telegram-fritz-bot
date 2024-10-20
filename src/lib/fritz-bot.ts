@@ -19,15 +19,14 @@ export class FritzBot {
   private async getWordsToPractice() {
 
     const session = await store.getSession(this.chatId);
-    const googleSheetWords = await getWords(this.topic);
+    const googleSheetWords = await getWords(this.topic, this.speechPart);
 
     // get all words for the selected topic
     this.allWords = session?.words ? session.words : googleSheetWords;
 
     // get the words to practice
     return this.allWords
-      .filter(word => word.status === TelegramConstants.WordStatuses.ToPractice)
-      .filter(word => word.speech_part === this.speechPart);
+      .filter(word => word.status === TelegramConstants.WordStatuses.ToPractice);
   }
 
   private getRandomWordToPractice() {
