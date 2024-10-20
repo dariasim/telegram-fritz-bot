@@ -1,6 +1,6 @@
 import { Entity } from 'electrodb';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { logger } from './logger';
+import { logger } from '../lib/logger';
 
 export class SessionStore {
 
@@ -26,6 +26,10 @@ export class SessionStore {
           type: "string",
           required: true
         },
+        speech_part: {
+          type: "string",
+          required: true
+        },
         words: {
           type: "list",
           required: true,
@@ -33,7 +37,7 @@ export class SessionStore {
             type: "map",
             properties: {
               german: { type: "string", required: true },
-              russian: { type: "string", required: true },
+              english: { type: "string", required: true },
               status: { type: "string", required: true }
             }
           }
@@ -42,7 +46,7 @@ export class SessionStore {
           type: "map",
           properties: {
             german: { type: "string", required: true },
-            russian: { type: "string", required: true },
+            english: { type: "string", required: true },
             status: { type: "string", required: true }
           }
         },

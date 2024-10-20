@@ -1,7 +1,7 @@
 export const WordStatuses = {
   ToPractice: 'to_practice',
   Practiced: 'practiced'
-} as const
+} as const;
 
 export type TelegramAction = typeof TelegramActions [keyof typeof TelegramActions];
 export const TelegramActions = {
@@ -9,6 +9,7 @@ export const TelegramActions = {
   SelectPracticeAnswer: '2',
   SelectReviewAnswer: '3',
   SelectExerciseType: '4',
+  SelectSpeechPart: '5',
 } as const;
 
 export type ExerciseType = typeof ExerciseTypes[keyof typeof ExerciseTypes];

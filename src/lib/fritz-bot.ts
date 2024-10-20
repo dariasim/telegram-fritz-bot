@@ -1,5 +1,5 @@
-import { getTopics, getWords } from "./google-sheet";
-import { SessionStore } from "./db";
+import { getSpeechParts, getTopics, getWords } from "../stores/words-store";
+import { SessionStore } from "../stores/session-store";
 import { logger } from "./logger";
 import { client } from "./telegram";
 import * as TelegramConstants from "../constants/telegram";
@@ -11,6 +11,7 @@ export class FritzBot {
   private chatId: number;
   private topic: string;
   private exerciseType: TelegramConstants.ExerciseType;
+  private speechPart: string;
   private allWords: Word[];
   private wordsToPractice: Word[];
   private session: TelegramSession;
@@ -18,13 +19,14 @@ export class FritzBot {
   private async getWordsToPractice() {
 
     const session = await store.getSession(this.chatId);
-    const googleSheetWords = await getWords(this.topic);
+    const googleSheetWords = await getWords(this.topic, this.speechPart);
 
     // get all words for the selected topic
     this.allWords = session?.words ? session.words : googleSheetWords;
 
     // get the words to practice
-    return this.allWords.filter(word => word.status === TelegramConstants.WordStatuses.ToPractice);
+    return this.allWords
+      .filter(word => word.status === TelegramConstants.WordStatuses.ToPractice);
   }
 
   private getRandomWordToPractice() {
@@ -52,6 +54,7 @@ export class FritzBot {
       id: this.chatId,
       topic: this.topic,
       words: this.allWords,
+      speech_part: this.speechPart,
       word: wordToReview,
       answers: items
     }
@@ -61,7 +64,7 @@ export class FritzBot {
 
     const request = {
       chatId: this.chatId,
-      text: `Please review the following words: \n\nGerman: *${wordToReview.german}* \n\nEnglish: *${wordToReview.russian}*`,
+      text: `Please review the following words: \n\nGerman: *${wordToReview.german}* \n\nEnglish: *${wordToReview.english}*`,
       items,
       action: TelegramConstants.TelegramActions.SelectReviewAnswer
     }
@@ -88,13 +91,14 @@ export class FritzBot {
     const wrongWords = this.allWords.filter(word => word.german !== wordToPractice.german).slice(0, 3);
 
     // items are composed of the correct word and 3 incorrect words (options for the user to select)
-    const items = [wordToPractice.russian, ...wrongWords.map(word => word.russian)];
+    const items = [wordToPractice.english, ...wrongWords.map(word => word.english)];
 
     // save current state in db
     const session = {
       id: this.chatId,
       topic: this.topic,
       words: this.allWords,
+      speech_part: this.speechPart,
       word: wordToPractice,
       answers: items
     }
@@ -171,6 +175,7 @@ export class FritzBot {
       topic: this.session.topic,
       words: this.allWords,
       word: this.session.word,
+      speech_part: this.speechPart,
       answers: this.session.answers
     }
 
@@ -190,6 +195,22 @@ export class FritzBot {
     return await client.sendMessageWithButtons(request);
   }
 
+  private async getSpeechPart() {
+
+    const speechParts = await getSpeechParts();
+
+    const request: SendMessageRequest = {
+      chatId: this.chatId,
+      text: 'Select which part of the speech you would like to practice:',
+      items: speechParts,
+      action: TelegramConstants.TelegramActions.SelectSpeechPart,
+      shouldShuffleArray: false
+    };
+
+    logger.info('Sending speech parts', { request });
+    return await client.sendMessageWithButtons(request);
+  }
+
   private async handleSelectedAction(input: TelegramEvent) {
 
     // callback query is the data that is sent when the user selects an option
@@ -202,20 +223,25 @@ export class FritzBot {
       case TelegramConstants.TelegramActions.SelectTopic: {
         this.topic = item;
         logger.info('Selected topic', { topic: this.topic });
-        return await this.getExerciseType();
+        return await this.getSpeechPart();
       }
 
       // this case is triggered when the user selects the exercise type
       case TelegramConstants.TelegramActions.SelectExerciseType: {
         this.exerciseType = item as TelegramConstants.ExerciseType;
         logger.info('Selected exercise type', { exerciseType: this.exerciseType });
-
-        // get the next question based on the selected exercise type
         switch (this.exerciseType) {
           case TelegramConstants.ExerciseTypes.Practice: return await this.getNextPracticeQuestion();
           case TelegramConstants.ExerciseTypes.Review: return await this.getNextReviewQuestion();
           default: return;
         }
+      }
+
+      // this case is triggered when the user selects the speech part
+      case TelegramConstants.TelegramActions.SelectSpeechPart: {
+        this.speechPart = item;
+        logger.info('Selected speech part', { speechPart: this.speechPart });
+        return await this.getExerciseType();
       }
 
       // this case is triggered when the user selects an answer for the review question
@@ -264,7 +290,7 @@ export class FritzBot {
         this.topic = this.session.topic;
 
         // check if the selected word is correct
-        const isCorrect = item === this.session.word.russian;
+        const isCorrect = item === this.session.word.english;
 
         // handle the case when the selected word is correct
         if (isCorrect) {

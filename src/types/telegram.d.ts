@@ -86,8 +86,9 @@ declare global {
 
   interface Word {
     german: string;
-    russian: string;
+    english: string;
     status: WordStatus;
+    speech_part: string;
   }
 
   interface TelegramSession {
@@ -96,6 +97,7 @@ declare global {
     word: Word;
     answers: string[];
     topic: string;
+    speech_part: string;
   }
 }
 
