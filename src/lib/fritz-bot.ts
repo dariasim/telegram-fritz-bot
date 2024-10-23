@@ -1,343 +1,306 @@
-import { getSpeechParts, getTopics, getWords } from "../stores/words-store";
-import { SessionStore } from "../stores/session-store";
-import { logger } from "./logger";
-import { client } from "./telegram";
-import * as TelegramConstants from "../constants/telegram";
+import { getSpeechParts, getTopics, getWords } from '../stores/words-store';
+import { SessionStore } from '../stores/session-store';
+import { logger } from './logger';
+import { client } from './telegram';
+import {
+  helloMessage,
+  topicsMessage,
+  wordToReviewMessage,
+  reviewWordLaterMessage,
+  incorrectAnswerMessage,
+  speechPartMessage,
+  exerciseTypeMessage,
+} from './messages';
+import * as TelegramConstants from '../constants/telegram';
 
 const store = new SessionStore();
 
-export class FritzBot {
+let chatId: number;
+let topic: string;
+let exerciseType: TelegramConstants.ExerciseType;
+let speechPart: string;
+let allWords: Word[];
+let wordsToPractice: Word[];
+let session: TelegramSession;
 
-  private chatId: number;
-  private topic: string;
-  private exerciseType: TelegramConstants.ExerciseType;
-  private speechPart: string;
-  private allWords: Word[];
-  private wordsToPractice: Word[];
-  private session: TelegramSession;
+const getWordsToPractice = async () => {
+  const session = await store.getSession(chatId);
+  const googleSheetWords = await getWords(topic, speechPart);
 
-  private async getWordsToPractice() {
+  // get all words for the selected topic
+  allWords = session?.words ? session.words : googleSheetWords;
 
-    const session = await store.getSession(this.chatId);
-    const googleSheetWords = await getWords(this.topic, this.speechPart);
+  // get the words to practice
+  return allWords.filter((word) => word.status === TelegramConstants.WordStatuses.ToPractice);
+};
 
-    // get all words for the selected topic
-    this.allWords = session?.words ? session.words : googleSheetWords;
+const getRandomWordToPractice = () => {
+  return wordsToPractice[Math.floor(Math.random() * wordsToPractice.length)];
+};
 
-    // get the words to practice
-    return this.allWords
-      .filter(word => word.status === TelegramConstants.WordStatuses.ToPractice);
+const getNextReviewQuestion = async () => {
+  // get words to practice
+  wordsToPractice = await getWordsToPractice();
+  logger.debug('Words to review', { wordsToPractice });
+
+  // handle the case when there are no words to practice
+  if (wordsToPractice.length === 0) {
+    return await client.sendMessage({ chatId, text: 'Congrats! You reviewed all the words.' });
   }
 
-  private getRandomWordToPractice() {
-    return this.wordsToPractice[Math.floor(Math.random() * this.wordsToPractice.length)];
+  // get a random word to review
+  const wordToReview = getRandomWordToPractice();
+
+  // items are composed of two options: "Ok" and "Review later"
+  const items = [TelegramConstants.ReviewAnswers.ReviewLater, TelegramConstants.ReviewAnswers.Ok];
+
+  // save current state in db
+  const session = {
+    id: chatId,
+    topic,
+    words: allWords,
+    speech_part: speechPart,
+    word: wordToReview,
+    answers: items,
+  };
+
+  logger.info('Saving the current session', { session });
+  await store.insertSession(session);
+
+  const request = {
+    chatId,
+    text: `Please review the following words: \n\nGerman: *${wordToReview.german}* \n\nEnglish: *${wordToReview.english}*`,
+    items,
+    action: TelegramConstants.TelegramActions.SelectReviewAnswer,
+  };
+
+  logger.info('Sending the next question', { request });
+  return await client.sendMessageWithButtons(request);
+};
+
+const getNextPracticeQuestion = async () => {
+  // get words to practice
+  wordsToPractice = await getWordsToPractice();
+  logger.info('Words to practice', { wordsToPractice });
+
+  // handle the case when there are no words to practice
+  if (wordsToPractice.length === 0) {
+    return await client.sendMessage({ chatId, text: 'Congrats! You practiced all the words correctly!' });
   }
 
-  private async getNextReviewQuestion() {
-    // get words to practice
-    this.wordsToPractice = await this.getWordsToPractice();
-    logger.info('Words to review', { wordsToPractice: this.wordsToPractice });
+  // get a random word to practice
+  const wordToPractice = getRandomWordToPractice();
 
-    // handle the case when there are no words to practice
-    if (this.wordsToPractice.length === 0) {
-      return await client.sendMessage({ chatId: this.chatId, text: 'Congrats! You reviewed all the words.' });
+  // get 3 other incorrect random words
+  const wrongWords = allWords.filter((word) => word.german !== wordToPractice.german).slice(0, 3);
+
+  // items are composed of the correct word and 3 incorrect words (options for the user to select)
+  const items = [wordToPractice.english, ...wrongWords.map((word) => word.english)];
+
+  // save current state in db
+  const session = {
+    id: chatId,
+    topic,
+    words: allWords,
+    speech_part: speechPart,
+    word: wordToPractice,
+    answers: items,
+  };
+
+  logger.info('Saving the current session', { session });
+  await store.insertSession(session);
+
+  const request = {
+    chatId: chatId,
+    text: `Select translation for: ${wordToPractice.german}`,
+    items,
+    action: TelegramConstants.TelegramActions.SelectPracticeAnswer,
+    shouldShuffleArray: true,
+  };
+
+  logger.info('Sending the next question', { request });
+  return await client.sendMessageWithButtons(request);
+};
+
+const updateWordStatus = async () => {
+  // update the word status to practiced
+  allWords = allWords.map((word) => {
+    if (word.german === session.word.german) {
+      return { ...word, status: TelegramConstants.WordStatuses.Practiced };
     }
 
-    // get a random word to review
-    const wordToReview = this.getRandomWordToPractice();
+    return word;
+  });
 
-    // items are composed of two options: "Ok" and "Review later"
-    const items = [TelegramConstants.ReviewAnswers.ReviewLater, TelegramConstants.ReviewAnswers.Ok];
+  // save the updated session
+  const request = {
+    id: chatId,
+    topic: session.topic,
+    words: allWords,
+    word: session.word,
+    speech_part: speechPart,
+    answers: session.answers,
+  };
 
-    // save current state in db
-    const session = {
-      id: this.chatId,
-      topic: this.topic,
-      words: this.allWords,
-      speech_part: this.speechPart,
-      word: wordToReview,
-      answers: items
+  logger.debug(`Updating the word status for word "${session.word}" to "${TelegramConstants.WordStatuses.Practiced}"`, {
+    request,
+  });
+  await store.insertSession(request);
+};
+
+const getExerciseType = async () => {
+  const request = {
+    chatId,
+    text: exerciseTypeMessage,
+    items: [TelegramConstants.ExerciseTypes.Review, TelegramConstants.ExerciseTypes.Practice],
+    action: TelegramConstants.TelegramActions.SelectExerciseType,
+  };
+
+  return await client.sendMessageWithButtons(request);
+};
+
+const getSpeechPart = async () => {
+  const speechParts = await getSpeechParts();
+
+  const request: SendMessageRequest = {
+    chatId,
+    text: speechPartMessage,
+    items: speechParts,
+    action: TelegramConstants.TelegramActions.SelectSpeechPart,
+    shouldShuffleArray: false,
+  };
+
+  return await client.sendMessageWithButtons(request);
+};
+
+const handleSelectedAction = async (input: TelegramEvent) => {
+  // callback query is the data that is sent when the user selects an option
+  const { action, item } = JSON.parse(input.callback_query.data) as TelegramCallbackQueryData;
+
+  // handle the selected action from user
+  switch (action) {
+    // this case is triggered the first time when the user selects a topic
+    case TelegramConstants.TelegramActions.SelectTopic: {
+      topic = item;
+      logger.debug('Selected topic', { topic });
+      return await getSpeechPart();
     }
 
-    logger.info('Saving the current session', { session });
-    await store.insertSession(session);
-
-    const request = {
-      chatId: this.chatId,
-      text: `Please review the following words: \n\nGerman: *${wordToReview.german}* \n\nEnglish: *${wordToReview.english}*`,
-      items,
-      action: TelegramConstants.TelegramActions.SelectReviewAnswer
+    // this case is triggered when the user selects the exercise type
+    case TelegramConstants.TelegramActions.SelectExerciseType: {
+      exerciseType = item as TelegramConstants.ExerciseType;
+      logger.debug('Selected exercise type', { exerciseType });
+      switch (exerciseType) {
+        case TelegramConstants.ExerciseTypes.Practice:
+          return await getNextPracticeQuestion();
+        case TelegramConstants.ExerciseTypes.Review:
+          return await getNextReviewQuestion();
+        default:
+          return;
+      }
     }
 
-    logger.info('Sending the next question', { request });
-    return await client.sendMessageWithButtons(request);
-  }
-
-  private async getNextPracticeQuestion() {
-
-    // get words to practice
-    this.wordsToPractice = await this.getWordsToPractice();
-    logger.info('Words to practice', { wordsToPractice: this.wordsToPractice });
-
-    // handle the case when there are no words to practice
-    if (this.wordsToPractice.length === 0) {
-      return await client.sendMessage({ chatId: this.chatId, text: 'Congrats! You practiced all the words correctly!' });
+    // this case is triggered when the user selects the speech part
+    case TelegramConstants.TelegramActions.SelectSpeechPart: {
+      speechPart = item;
+      logger.info('Selected speech part', { speechPart });
+      return await getExerciseType();
     }
 
-    // get a random word to practice
-    const wordToPractice = this.getRandomWordToPractice();
+    // this case is triggered when the user selects an answer for the review question
+    case TelegramConstants.TelegramActions.SelectReviewAnswer: {
+      // get the current session for the current user
+      session = await store.getSession(chatId);
+      topic = session.topic;
 
-    // get 3 other incorrect random words
-    const wrongWords = this.allWords.filter(word => word.german !== wordToPractice.german).slice(0, 3);
+      const shouldReviewLater = item === TelegramConstants.ReviewAnswers.ReviewLater;
 
-    // items are composed of the correct word and 3 incorrect words (options for the user to select)
-    const items = [wordToPractice.english, ...wrongWords.map(word => word.english)];
+      // handle the case when the user selects to "Ok"
+      if (!shouldReviewLater) {
+        // send a message to the user that the selected word is correct
+        const request = { chatId, text: wordToReviewMessage };
 
-    // save current state in db
-    const session = {
-      id: this.chatId,
-      topic: this.topic,
-      words: this.allWords,
-      speech_part: this.speechPart,
-      word: wordToPractice,
-      answers: items
-    }
-
-    logger.info('Saving the current session', { session });
-    await store.insertSession(session);
-
-    const request = {
-      chatId: this.chatId,
-      text: `Select translation for: ${wordToPractice.german}`,
-      items,
-      action: TelegramConstants.TelegramActions.SelectPracticeAnswer,
-      shouldShuffleArray: true
-    }
-
-    logger.info('Sending the next question', { request });
-    return await client.sendMessageWithButtons(request);
-  }
-
-  private async handleMessage(input: TelegramEvent) {
-
-    const { first_name, username } = input.message.from;
-
-    // send a default message when the user sends a message
-    const request = {
-      chatId: this.chatId,
-      text: `Hello ${first_name || username} I am Fritz Bot. I can help you practice German words. Select an option from the menu to start.`
-    };
-
-    logger.info('Sending a default message', { request });
-    return await client.sendMessage(request);
-  }
-
-  private async handleCommand() {
-
-    // reset any current ongoing sessions
-    await store.deleteSession(this.chatId);
-
-    // get topics from the google sheet
-    const topics = await getTopics();
-
-    // handle the case when there are no topics in the google sheet
-    if (!topics || topics.length === 0) {
-      return await client.sendMessage({ chatId: this.chatId, text: 'No topics found.' });
-    }
-
-    // send a message with the topics for the user to select
-    const request: SendMessageRequest = {
-      chatId: this.chatId,
-      text: 'Select which topic you would like to practice:',
-      items: topics,
-      action: TelegramConstants.TelegramActions.SelectTopic,
-      shouldShuffleArray: false
-    };
-
-    logger.info('Starting the session', { request });
-    return await client.sendMessageWithButtons(request);
-  }
-
-  private async updateWordStatus() {
-
-    // update the word status to practiced
-    this.allWords = this.allWords.map(word => {
-      if (word.german === this.session.word.german) {
-        return { ...word, status: TelegramConstants.WordStatuses.Practiced };
+        await updateWordStatus();
+        await client.sendMessage(request);
+        return await getNextReviewQuestion();
       }
 
-      return word;
-    });
-
-    // save the updated session
-    const request = {
-      id: this.chatId,
-      topic: this.session.topic,
-      words: this.allWords,
-      word: this.session.word,
-      speech_part: this.speechPart,
-      answers: this.session.answers
+      // handle the case when the user selects to "Review later"
+      else {
+        // send a message to the user that the selected word is incorrect
+        const request = { chatId, text: reviewWordLaterMessage };
+        await client.sendMessage(request);
+        return await getNextReviewQuestion();
+      }
     }
 
-    logger.info(`Updating the word status for word "${this.session.word}" to "${TelegramConstants.WordStatuses.Practiced}"`, { request });
-    await store.insertSession(request);
-  }
+    // this case is triggered when the user selects an answer for the practice question
+    case TelegramConstants.TelegramActions.SelectPracticeAnswer: {
+      // get the current session for the current user
+      session = await store.getSession(chatId);
+      topic = session.topic;
 
-  private async getExerciseType() {
-    const request = {
-      chatId: this.chatId,
-      text: `What kind of exercise would you like to do?`,
-      items: [TelegramConstants.ExerciseTypes.Review, TelegramConstants.ExerciseTypes.Practice],
-      action: TelegramConstants.TelegramActions.SelectExerciseType
-    }
+      // check if the selected word is correct
+      const isCorrect = item === session.word.english;
 
-    logger.info('Sending exercise types', { request });
-    return await client.sendMessageWithButtons(request);
-  }
+      // handle the case when the selected word is correct
+      if (isCorrect) {
+        // send a message to the user that the selected word is correct
+        const request = { chatId, text: 'Correct' };
 
-  private async getSpeechPart() {
-
-    const speechParts = await getSpeechParts();
-
-    const request: SendMessageRequest = {
-      chatId: this.chatId,
-      text: 'Select which part of the speech you would like to practice:',
-      items: speechParts,
-      action: TelegramConstants.TelegramActions.SelectSpeechPart,
-      shouldShuffleArray: false
-    };
-
-    logger.info('Sending speech parts', { request });
-    return await client.sendMessageWithButtons(request);
-  }
-
-  private async handleSelectedAction(input: TelegramEvent) {
-
-    // callback query is the data that is sent when the user selects an option
-    const { action, item } = JSON.parse(input.callback_query.data) as TelegramCallbackQueryData;
-
-    // handle the selected action from user
-    switch (action) {
-
-      // this case is triggered the first time when the user selects a topic
-      case TelegramConstants.TelegramActions.SelectTopic: {
-        this.topic = item;
-        logger.info('Selected topic', { topic: this.topic });
-        return await this.getSpeechPart();
+        await updateWordStatus();
+        await client.sendMessage(request);
+        return await getNextPracticeQuestion();
       }
 
-      // this case is triggered when the user selects the exercise type
-      case TelegramConstants.TelegramActions.SelectExerciseType: {
-        this.exerciseType = item as TelegramConstants.ExerciseType;
-        logger.info('Selected exercise type', { exerciseType: this.exerciseType });
-        switch (this.exerciseType) {
-          case TelegramConstants.ExerciseTypes.Practice: return await this.getNextPracticeQuestion();
-          case TelegramConstants.ExerciseTypes.Review: return await this.getNextReviewQuestion();
-          default: return;
-        }
-      }
-
-      // this case is triggered when the user selects the speech part
-      case TelegramConstants.TelegramActions.SelectSpeechPart: {
-        this.speechPart = item;
-        logger.info('Selected speech part', { speechPart: this.speechPart });
-        return await this.getExerciseType();
-      }
-
-      // this case is triggered when the user selects an answer for the review question
-      case TelegramConstants.TelegramActions.SelectReviewAnswer: {
-        // get the current session for the current user
-        this.session = await store.getSession(this.chatId);
-        this.topic = this.session.topic;
-
-        const shouldReviewLater = item === TelegramConstants.ReviewAnswers.ReviewLater;
-
-        // handle the case when the user selects to "Ok"
-        if (!shouldReviewLater) {
-
-          // send a message to the user that the selected word is correct
-          const request = {
-            chatId: this.chatId,
-            text: 'Ok. Here is your next word to review.',
-          }
-
-          logger.info('Selected word is ok', { word: this.session.word });
-          await this.updateWordStatus();
-          await client.sendMessage(request);
-          return await this.getNextReviewQuestion();
-        }
-
-        // handle the case when the user selects to "Review later"
-        else {
-
-          // send a message to the user that the selected word is incorrect
-          const request = {
-            chatId: this.chatId,
-            text: 'Ok, we will review this word later.',
-          }
-
-          logger.info('Selected word is review later', { request });
-          await client.sendMessage(request);
-          return await this.getNextReviewQuestion();
-        }
-      }
-
-      // this case is triggered when the user selects an answer for the practice question
-      case TelegramConstants.TelegramActions.SelectPracticeAnswer: {
-
-        // get the current session for the current user
-        this.session = await store.getSession(this.chatId);
-        this.topic = this.session.topic;
-
-        // check if the selected word is correct
-        const isCorrect = item === this.session.word.english;
-
-        // handle the case when the selected word is correct
-        if (isCorrect) {
-
-          // send a message to the user that the selected word is correct
-          const request = {
-            chatId: this.chatId,
-            text: 'Correct',
-          }
-
-          logger.info('Selected word is correct', { word: this.session.word });
-          await this.updateWordStatus();
-          await client.sendMessage(request);
-          return await this.getNextPracticeQuestion();
-        }
-
-        // if the selected word is incorrect
-        else {
-
-          // send a message to the user that the selected word is incorrect
-          const request = {
-            chatId: this.chatId,
-            text: 'Incorrect. We will try again later.',
-          }
-
-          logger.info('Selected word is incorrect', { request });
-          await client.sendMessage(request);
-          return await this.getNextPracticeQuestion();
-        }
+      // if the selected word is incorrect
+      else {
+        // send a message to the user that the selected word is incorrect
+        const request = { chatId, text: incorrectAnswerMessage };
+        await client.sendMessage(request);
+        return await getNextPracticeQuestion();
       }
     }
   }
+};
 
-  public async handleEvent(input: TelegramEvent) {
+const handleMessage = (input: TelegramEvent) => {
+  const { first_name, username } = input.message.from;
+  const request = { chatId, text: helloMessage(first_name || username) };
+  return client.sendMessage(request);
+};
 
-    logger.info('Handling event', { input });
+const handleCommand = async () => {
+  // reset any current ongoing sessions
+  await store.deleteSession(chatId);
 
-    // save chat id
-    this.chatId = input?.message?.chat?.id || input?.callback_query?.message?.chat?.id;
+  // get topics from the google sheet
+  const topics = await getTopics();
 
-    // handle command (start bot)
-    if (input?.message?.entities?.[0]) return this.handleCommand();
+  // send a message with the topics for the user to select
+  const request: SendMessageRequest = {
+    chatId: chatId,
+    text: topicsMessage,
+    items: topics,
+    action: TelegramConstants.TelegramActions.SelectTopic,
+    shouldShuffleArray: false,
+  };
 
-    // handle message
-    if (input.message) return this.handleMessage(input);
+  logger.debug('Starting the session', { request });
+  return await client.sendMessageWithButtons(request);
+};
 
-    // handle selected action
-    if (input.callback_query) return this.handleSelectedAction(input);
-  }
-}
+export const handleEvent = (input: TelegramEvent) => {
+  logger.debug('Handling event', { input });
+
+  chatId = input?.message?.chat?.id || input?.callback_query?.message?.chat?.id;
+
+  // handle command (start bot)
+  if (input?.message?.entities?.[0]) return handleCommand();
+
+  // handle message
+  if (input.message) return handleMessage(input);
+
+  // handle selected action
+  if (input.callback_query) return handleSelectedAction(input);
+};
