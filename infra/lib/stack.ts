@@ -46,6 +46,7 @@ export class FritzBotStack extends cdk.Stack {
       memorySize: 1024,
       entry: 'src/lambda/fritz-bot-lambda.ts',
       loggingFormat: lambda.LoggingFormat.JSON,
+      applicationLogLevelV2: lambda.ApplicationLogLevel.INFO,
       systemLogLevelV2: lambda.SystemLogLevel.WARN,
       logRetention: 7,
       role: lambdaRole,
@@ -55,7 +56,7 @@ export class FritzBotStack extends cdk.Stack {
         sourceMap: false,
       },
     });
-
+[]
     // Create Lambda integrations
     const fritzBotLambdaIntegration = new integrations.HttpLambdaIntegration('FritzBotLambdaIntegration', fritzBotLambda);
 
